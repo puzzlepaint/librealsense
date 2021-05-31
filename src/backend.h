@@ -431,7 +431,7 @@ namespace librealsense
                     if (_dev->set_xu(xu, ctrl, data, len))
                         return true;
 
-                    std::this_thread::sleep_for(std::chrono::milliseconds(DELAY_FOR_RETRIES));
+//                     std::this_thread::sleep_for(std::chrono::milliseconds(DELAY_FOR_RETRIES));
                 }
                 return false;
             }
@@ -443,7 +443,7 @@ namespace librealsense
                     if (_dev->get_xu(xu, ctrl, data, len))
                         return true;
 
-                    std::this_thread::sleep_for(std::chrono::milliseconds(DELAY_FOR_RETRIES));
+//                     std::this_thread::sleep_for(std::chrono::milliseconds(DELAY_FOR_RETRIES));
                 }
                 return false;
             }

@@ -1167,10 +1167,11 @@ namespace librealsense
         {
             uvc_xu_control_query q = {static_cast<uint8_t>(xu.unit), control, UVC_GET_CUR,
                                       static_cast<uint16_t>(size), const_cast<uint8_t *>(data)};
-            if(xioctl(_fd, UVCIOC_CTRL_QUERY, &q) < 0)
+            while (xioctl(_fd, UVCIOC_CTRL_QUERY, &q) < 0)
             {
+                // std::cerr << "- get_xu() ioctl FAILED with errno " << (int)errno << " at " << (std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - startTime).count()) << "\n";
                 if (errno == EIO || errno == EAGAIN || errno == EBUSY) // TODO: Log?
-                    return false;
+                    continue;
 
                 throw linux_backend_exception("get_xu(...). xioctl(UVCIOC_CTRL_QUERY) failed");
             }
