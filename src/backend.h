@@ -168,11 +168,12 @@ namespace librealsense
 
         struct frame_object
         {
-            size_t          frame_size;
-            uint8_t         metadata_size;
-            const void *    pixels;
-            const void *    metadata;
-            rs2_time_t      backend_time;
+            size_t                      frame_size;
+            uint8_t                     metadata_size;
+            const void *                pixels;
+            const void *                metadata;
+            rs2_time_t                  backend_time;
+            std::vector<unsigned char>* swappable_buffer;
         };
 
         typedef std::function<void(stream_profile, frame_object, std::function<void()>)> frame_callback;

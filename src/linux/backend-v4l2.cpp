@@ -36,6 +36,7 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/sysmacros.h> // minor(...), major(...)
+#include <sys/utsname.h>
 #include <linux/usb/video.h>
 #include <linux/uvcvideo.h>
 #include <linux/videodev2.h>
@@ -241,7 +242,25 @@ namespace librealsense
                 throw linux_backend_exception("xioctl(VIDIOC_QUERYBUF) failed");
 
             // Prior to kernel 4.16 metadata payload was attached to the end of the video payload
-            uint8_t md_extra = (V4L2_BUF_TYPE_VIDEO_CAPTURE==type) ? MAX_META_DATA_SIZE : 0;
+            uint8_t md_extra = 0;
+            if (V4L2_BUF_TYPE_VIDEO_CAPTURE==type)
+            {
+                md_extra = MAX_META_DATA_SIZE;
+                
+                struct utsname utsname_data;
+                int kernel_version_major;
+                int kernel_version_minor;
+                if (uname(&utsname_data) == 0 &&
+                    sscanf(utsname_data.release, "%i.%i", &kernel_version_major, &kernel_version_minor) == 2 &&
+                    (kernel_version_major > 4 || (kernel_version_major == 4 && kernel_version_minor >= 16)))
+                {
+                    // The kernel is recent enough to not require space for metadata after the video data.
+                    // This means that we can allocate the buffer with the same size as the video_frame buffers,
+                    // which, while only providing insignificant memory savings, later allows the fast code path
+                    // to be used that swaps these buffers instead of doing a memcpy.
+                    md_extra = 0;
+                }
+            }
             _original_length = buf.length;
             _length = _original_length + md_extra;
 
@@ -256,8 +275,16 @@ namespace librealsense
             else
             {
                 //_length += (V4L2_BUF_TYPE_VIDEO_CAPTURE==type) ? MAX_META_DATA_SIZE : 0;
-                _start = static_cast<uint8_t*>(malloc( _length));
-                if (!_start) throw linux_backend_exception("User_p allocation failed!");
+                try
+                {
+                    _user_buf.resize(_length);
+                }
+                catch(const std::exception & e)
+                {
+                    throw linux_backend_exception("User_p allocation failed!");
+                }
+                _start = _user_buf.data();
+                
                 memset(_start, 0, _length);
             }
         }
@@ -272,6 +299,7 @@ namespace librealsense
 
             if ( !_use_memory_map )
             {
+                _start = _user_buf.data();
                 buf.m.userptr = reinterpret_cast<unsigned long>(_start);
             }
             if(xioctl(fd, VIDIOC_QBUF, &buf) < 0)
@@ -286,10 +314,6 @@ namespace librealsense
             {
                if(munmap(_start, _length) < 0)
                    linux_backend_exception("munmap");
-            }
-            else
-            {
-               free(_start);
             }
         }
 
@@ -314,6 +338,9 @@ namespace librealsense
             {
                 if (!_use_memory_map)
                 {
+                    _start = _user_buf.data();
+                    _buf.m.userptr = reinterpret_cast<unsigned long>(_start);
+                    
                     auto metadata_offset = get_full_length() - MAX_META_DATA_SIZE;
                     memset((byte*)(get_frame_start()) + metadata_offset, 0, MAX_META_DATA_SIZE);
                 }
@@ -1086,7 +1113,7 @@ namespace librealsense
                                     auto frame_sz = buf_mgr.md_node_present() ? buf.bytesused :
                                                         std::min(buf.bytesused - buf_mgr.metadata_size(), buffer->get_length_frame_only());
                                     frame_object fo{ frame_sz, buf_mgr.metadata_size(),
-                                                     buffer->get_frame_start(), buf_mgr.metadata_start(), timestamp };
+                                                     buffer->get_frame_start(), buf_mgr.metadata_start(), timestamp, buffer->get_swappable_buffer() };
 
                                     buffer->attach_buffer(buf);
                                     buf_mgr.handle_buffer(e_video_buf,-1); // transfer new buffer request to the frame callback

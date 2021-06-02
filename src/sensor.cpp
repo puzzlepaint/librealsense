@@ -365,8 +365,12 @@ namespace librealsense
 
                     if (fh.frame)
                     {
-                        memcpy((void*)fh->get_frame_data(), f.pixels, f.frame_size);
                         auto&& video = (video_frame*)fh.frame;
+                        if (f.swappable_buffer != nullptr && f.swappable_buffer->size() == video->data.size())
+                            std::swap(video->data, *f.swappable_buffer);
+                        else
+                            memcpy((void*)fh->get_frame_data(), f.pixels, f.frame_size);
+                        
                         video->assign(width, height, width * bpp / 8, bpp);
                         video->set_timestamp_domain(timestamp_domain);
                         fh->set_stream(req_profile_base);

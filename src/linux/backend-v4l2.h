@@ -138,6 +138,8 @@ namespace librealsense
             uint8_t* get_frame_start() const { return _start; }
 
             bool use_memory_map() const { return _use_memory_map; }
+            
+            std::vector<byte>* get_swappable_buffer() { return _use_memory_map ? nullptr : &_user_buf; }
 
         private:
             v4l2_buf_type _type;
@@ -147,6 +149,7 @@ namespace librealsense
             bool _use_memory_map;
             uint32_t _index;
             v4l2_buffer _buf;
+            std::vector<byte> _user_buf;
             std::mutex _mutex;
             bool _must_enqueue = false;
         };
