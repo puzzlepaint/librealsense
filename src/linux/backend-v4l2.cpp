@@ -1113,7 +1113,7 @@ namespace librealsense
                                     auto frame_sz = buf_mgr.md_node_present() ? buf.bytesused :
                                                         std::min(buf.bytesused - buf_mgr.metadata_size(), buffer->get_length_frame_only());
                                     frame_object fo{ frame_sz, buf_mgr.metadata_size(),
-                                                     buffer->get_frame_start(), buf_mgr.metadata_start(), timestamp, buffer->get_swappable_buffer() };
+                                                     buffer->get_frame_start(), buf_mgr.metadata_start(), timestamp, buffer->get_swappable_buffer(), 0 };
 
                                     buffer->attach_buffer(buf);
                                     buf_mgr.handle_buffer(e_video_buf,-1); // transfer new buffer request to the frame callback

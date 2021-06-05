@@ -340,6 +340,8 @@ namespace librealsense
                         return;
                     }
 
+                    // TODO: This seems like it may be currently unused?
+                    //       If reactivating it, take care that f.pixels may not point to valid data anymore after the swap_vector() call below.
                     frame_continuation release_and_enqueue(continuation, f.pixels);
 
                     LOG_DEBUG("FrameAccepted," << librealsense::get_string(req_profile_base->get_stream_type())
@@ -358,7 +360,8 @@ namespace librealsense
                     int width = vsp ? vsp->get_width() : 0;
                     int height = vsp ? vsp->get_height() : 0;
 
-                    frame_holder fh = _source.alloc_frame(stream_to_frame_types(req_profile_base->get_stream_type()), width * height * bpp / 8, fr->additional_data, requires_processing);
+                    size_t frame_buffer_size = (f.swappable_buffer != nullptr) ? f.swappable_buffer->size() : (width * height * bpp / 8);
+                    frame_holder fh = _source.alloc_frame(stream_to_frame_types(req_profile_base->get_stream_type()), frame_buffer_size, fr->additional_data, requires_processing);
                     auto diff = environment::get_instance().get_time_service()->get_time() - system_time;
                     if (diff >10 )
                         LOG_DEBUG("!! Frame allocation took " << diff << " msec");
@@ -366,11 +369,11 @@ namespace librealsense
                     if (fh.frame)
                     {
                         auto&& video = (video_frame*)fh.frame;
-                        if (f.swappable_buffer != nullptr && f.swappable_buffer->size() == video->data.size())
-                            std::swap(video->data, *f.swappable_buffer);
+                        if (f.swappable_buffer != nullptr && f.swappable_buffer->size() == video->data.full_buffer_size())
+                            video->data.swap_vector(*f.swappable_buffer, f.swappable_buffer->data() + f.frame_offset, f.frame_size);
                         else
                             memcpy((void*)fh->get_frame_data(), f.pixels, f.frame_size);
-                        
+
                         video->assign(width, height, width * bpp / 8, bpp);
                         video->set_timestamp_domain(timestamp_domain);
                         fh->set_stream(req_profile_base);

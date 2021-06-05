@@ -174,6 +174,7 @@ namespace librealsense
             const void *                metadata;
             rs2_time_t                  backend_time;
             std::vector<unsigned char>* swappable_buffer;
+            size_t                      frame_offset;
         };
 
         typedef std::function<void(stream_profile, frame_object, std::function<void()>)> frame_callback;

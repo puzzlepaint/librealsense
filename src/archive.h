@@ -93,11 +93,93 @@ namespace librealsense
         std::shared_ptr<platform::time_service> ts,
         std::shared_ptr<metadata_parser_map> parsers);
 
+    // Behaves like a std::vector, while referring to a potentially limited range within the data of an actual std::vector object only.
+    //
+    // This class is used to implement zero-copy frame handling:
+    // Frames may have header and/or metadata prepended or appended when received from the backend.
+    // This part of the frame data is undesirable for the frame class: it needs to have a view onto
+    // the pixel data within the frame memory buffer only, while excluding headers/metadata.
+    // To avoid having to copy the (potentially large) frame data into a separate buffer, a vector_view onto the received data buffer is used
+    // that views the pixel data only and excludes any potential header data or metadata.
+    template <typename T>
+    class vector_view
+    {
+    public:
+        inline vector_view() {};
+
+        inline vector_view(std::vector<T>&& vector, T* data, std::size_t size)
+            : _vector(std::move(vector)),
+              _data(data),
+              _size(size) {}
+
+        inline vector_view(const vector_view<T>& other) = delete;
+        inline vector_view(vector_view<T>&& other)
+            : _vector(std::move(other._vector)),
+              _data(other._data),
+              _size(other._size) {}
+
+        inline vector_view& operator= (const vector_view<T>& other) = delete;
+        inline vector_view& operator= (vector_view<T>&& other)
+        {
+            _vector = std::move(other._vector);
+            _data = other._data;
+            _size = other._size;
+
+            return *this;
+        }
+
+        inline void swap_vector(std::vector<T>& vector, T* data, std::size_t size)
+        {
+            std::swap(vector, _vector);
+            _data = data;
+            _size = size;
+        }
+
+        // Note: resize() changes the view to cover the whole vector (after resizing).
+        inline void resize(std::size_t new_size, const T& x = T())
+        {
+            _vector.resize(new_size, x);
+
+            _data = _vector.data();
+            _size = _vector.size();
+        }
+
+        // Note: assign() changes the view to cover the whole vector (after potential resizing).
+        template<typename InputIterator>
+        inline void assign(InputIterator first, InputIterator last)
+        {
+            _vector.assign(first, last);
+
+            _data = _vector.data();
+            _size = _vector.size();
+        }
+
+        inline const T* data() const { return _data; }
+        inline T* data() { return _data; }
+
+        /// Returns the size of the view. The size of the underlying vector may be larger.
+        inline std::size_t size() const { return _size; }
+
+        /// Returns the full size of the underlying vector. The size of the view may be smaller.
+        inline std::size_t full_buffer_size() const { return _vector.size(); }
+
+        inline const T& at(std::size_t n) const { return _data[n]; }
+        inline T& at(std::size_t n) { return _data[n]; }
+
+        inline const T& operator[] (std::size_t n) const { return _data[n]; }
+        inline T& operator[] (std::size_t n) { return _data[n]; }
+
+    private:
+        std::vector<T> _vector;
+        T* _data = nullptr;
+        std::size_t _size = 0;
+    };
+
     // Define a movable but explicitly noncopyable buffer type to hold our frame data
     class LRS_EXTENSION_API frame : public frame_interface
     {
     public:
-        std::vector<byte> data;
+        vector_view<byte> data;
         frame_additional_data additional_data;
         std::shared_ptr<metadata_parser_map> metadata_parsers = nullptr;
         explicit frame() : ref_count(0), owner(nullptr), on_release(),_kept(false) {}
@@ -113,7 +195,7 @@ namespace librealsense
         frame& operator=(const frame& r) = delete;
         frame& operator=(frame&& r)
         {
-            data = move(r.data);
+            data = std::move(r.data);
             owner = r.owner;
             ref_count = r.ref_count.exchange(0);
             _kept = r._kept.exchange(false);

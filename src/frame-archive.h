@@ -38,7 +38,7 @@ namespace librealsense
                     // Attempt to obtain a buffer of the appropriate size from the freelist
                     for (auto it = begin(freelist); it != end(freelist); ++it)
                     {
-                        if (it->data.size() == size)
+                        if (it->data.full_buffer_size() == size)
                         {
                             backbuffer = std::move(*it);
                             freelist.erase(it);

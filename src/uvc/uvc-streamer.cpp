@@ -64,7 +64,8 @@ namespace librealsense
 
             LOG_DEBUG("Passing packet to user CB with size " << (data_len + header_len));
             librealsense::platform::frame_object fo{ data_len, header_len,
-                                                     fp->pixels.data() + header_len , fp->pixels.data() };
+                                                     fp->pixels.data() + header_len , fp->pixels.data(),
+                                                     {}, &fp->pixels, header_len };
             fp->fo = fo;
 
             queue.enqueue(std::move(fp));
